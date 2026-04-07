@@ -1,0 +1,24 @@
+target/
+.idea/
+*.iml
+.vscode/
+.DS_Store
+memory/
+!memory/.gitkeep
+karpathy-wiki.log
+
+# Personal wiki content — keep folder scaffolding, ignore data
+raw/*
+!raw/.gitkeep
+
+wiki/articles/*
+!wiki/articles/.gitkeep
+wiki/concepts/*
+!wiki/concepts/.gitkeep
+wiki/summaries/*
+!wiki/summaries/.gitkeep
+wiki/outputs/*
+!wiki/outputs/.gitkeep
+wiki/index.md
+wiki/backlinks.md
+wiki/log.md

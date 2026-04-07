@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: karpathy-wiki
+  main:
+    web-application-type: none
+  shell:
+    interactive:
+      enabled: true
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:REPLACE_ME}
+      chat:
+        options:
+          model: gpt-4o
+          temperature: 0.2
+
+wiki:
+  paths:
+    raw: ./raw
+    wiki: ./wiki
+    skills: ./skills
+    memory: ./memory
+  ingest:
+    auto-compile: true
+
+logging:
+  level:
+    com.danvega.wiki: DEBUG
