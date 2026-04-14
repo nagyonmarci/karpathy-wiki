@@ -1,6 +1,9 @@
 package com.danvega.wiki.ingest;
 
 import com.danvega.wiki.config.WikiProperties;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
@@ -42,9 +45,24 @@ public class IngestService {
                 .retrieve()
                 .body(String.class);
 
+        Document doc = Jsoup.parse(html, url);
+        doc.select(
+                "script, style, noscript, iframe, svg, link, meta, " +
+                "nav, header, footer, aside, form, button, " +
+                "[role=navigation], [role=banner], [role=contentinfo], " +
+                ".nav, .navigation, .menu, .sidebar, .footer, .header, " +
+                ".comments, .related, .share, .social, .ads, .advertisement"
+        ).remove();
+
+        Element main = doc.selectFirst(
+                "article, main, [role=main], .post, .post-content, .entry-content, .article-content"
+        );
+        Element root = main != null ? main : doc.body();
+        String cleaned = root.html();
+        log.info("Extracted {} chars of content from {} chars of HTML", cleaned.length(), html.length());
+
         String prompt = """
-                Convert the following HTML page into clean, readable Markdown.
-                - Remove navigation, ads, scripts, and boilerplate.
+                Convert the following HTML fragment into clean, readable Markdown.
                 - Preserve headings, code blocks, lists, tables, and meaningful links.
                 - Output Markdown only — no commentary.
 
@@ -52,7 +70,7 @@ public class IngestService {
 
                 HTML:
                 %s
-                """.formatted(url, html);
+                """.formatted(url, cleaned);
 
         String markdown = chatClient.prompt().user(prompt).call().content();
 
