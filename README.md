@@ -136,13 +136,32 @@ What happens:
 4. If `wiki.ingest.auto-compile=true` (the default), the
    `WikiCompilerAgent` immediately runs and integrates it into `wiki/`.
 
-**Option B — drop files directly:**
+**Option B — drop a YouTube transcript (or any notes):**
 
-Save any `.md`, `.txt`, or notes file into the `raw/` folder, then:
+Save any `.md`, `.txt`, or notes file into the `raw/` folder with YAML
+front-matter. If the content has an associated GitHub repo, add the `repo`
+field with the GitHub URL — the compiler will automatically shallow-clone
+it, weave real code snippets into the wiki pages, and clean up the clone
+when done.
+
+```yaml
+---
+title: Embabel First Look
+source: https://youtu.be/G5VDQCZu6t0
+repo: https://github.com/danvega/blog-agent
+tags: [java, embabel, ai, agents]
+---
+
+[paste transcript here]
+```
+
+Then compile:
 
 ```
 shell:> compile
 ```
+
+Multiple raw files can reference the same repo — it's only cloned once.
 
 ### Step 2 — Watch the wiki grow
 
@@ -192,13 +211,13 @@ Returns counts of files in `raw/` and `wiki/` plus your configured paths.
 
 ## Command reference
 
-| Command   | Options                                            | Purpose |
-|-----------|----------------------------------------------------|---------|
-| `ingest`  | `--url <url>` `--title <t>` `--tags a,b,c`         | Fetch URL → save to `raw/` → optionally auto-compile |
-| `compile` | _(none)_                                           | Run `WikiCompilerAgent` over `raw/` |
-| `query`   | `--question "..."`                                 | Ask `ResearchAgent`. Prints answer + sources |
-| `lint`    | _(none)_                                           | Run `WikiLinterAgent`. Prints structured report |
-| `status`  | _(none)_                                           | Counts and paths |
+| Command   | Shortcut | Options                                            | Purpose |
+|-----------|----------|----------------------------------------------------|---------|
+| `ingest`  | `i`      | `--url <url>` `--title <t>` `--tags a,b,c`         | Fetch URL → save to `raw/` → optionally auto-compile |
+| `compile` | `c`      | _(none)_                                           | Run `WikiCompilerAgent` over `raw/` |
+| `query`   | `q`      | `--question "..."`                                 | Ask `ResearchAgent`. Prints answer + sources |
+| `lint`    | `l`      | _(none)_                                           | Run `WikiLinterAgent`. Prints structured report |
+| `status`  | `s`      | _(none)_                                           | Counts and paths |
 
 Every successful `ingest`, `compile`, `query`, and `lint` invocation
 appends a one-line entry to `wiki/log.md` so you have an auditable

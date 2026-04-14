@@ -40,7 +40,7 @@ public class WikiCommands {
         this.log = log;
     }
 
-    @ShellMethod(key = "ingest", value = "Fetch a URL, convert to Markdown, save to raw/ (auto-compiles if enabled).")
+    @ShellMethod(key = {"ingest", "i"}, value = "Fetch a URL, convert to Markdown, save to raw/ (auto-compiles if enabled).")
     public String ingest(
             @ShellOption(value = {"--url"}, help = "Source URL to ingest") String url,
             @ShellOption(value = {"--title"}, help = "Optional title", defaultValue = ShellOption.NULL) String title,
@@ -58,14 +58,14 @@ public class WikiCommands {
         return out.toString();
     }
 
-    @ShellMethod(key = "compile", value = "Compile raw/ files into structured wiki content.")
+    @ShellMethod(key = {"compile", "c"}, value = "Compile raw/ files into structured wiki content.")
     public String compile() {
         String result = compiler.compile();
         log.append("compile", result);
         return result;
     }
 
-    @ShellMethod(key = "lint", value = "Lint the wiki for orphans, broken links, gaps, and contradictions.")
+    @ShellMethod(key = {"lint", "l"}, value = "Lint the wiki for orphans, broken links, gaps, and contradictions.")
     public String lint() {
         LintReport report = linter.lint();
         // LintReport fields come from LLM-deserialized JSON; any list may be null if the model omits it.
@@ -88,7 +88,7 @@ public class WikiCommands {
         return sb.toString();
     }
 
-    @ShellMethod(key = "query", value = "Ask a natural-language question against the wiki.")
+    @ShellMethod(key = {"query", "q"}, value = "Ask a natural-language question against the wiki.")
     public String query(@ShellOption(value = {"--question"}, help = "Question to ask") String question) {
         ResearchAgent.QueryResult result = research.query(question);
         log.append("query", question + " → " + result.sources().size() + " sources");
@@ -97,7 +97,7 @@ public class WikiCommands {
         return sb.toString();
     }
 
-    @ShellMethod(key = "status", value = "Show wiki/raw file counts and configured paths.")
+    @ShellMethod(key = {"status", "s"}, value = "Show wiki/raw file counts and configured paths.")
     public String status() throws Exception {
         long raw = count(props.paths().raw());
         long wiki = count(props.paths().wiki());
