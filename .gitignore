@@ -20,6 +20,5 @@ wiki/summaries/*
 !wiki/summaries/.gitkeep
 wiki/outputs/*
 !wiki/outputs/.gitkeep
-wiki/index.md
 wiki/backlinks.md
 wiki/log.md
