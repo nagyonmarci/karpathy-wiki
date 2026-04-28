@@ -89,10 +89,10 @@ If Ollama is already running on your machine (port 11434), `run.sh` will use
 it automatically. Otherwise Docker will start an Ollama container for you.
 
 ```bash
-# pull once — skip if you already have llama3.2
-ollama pull llama3.2
+# pull once — skip if you already have gemma4:31b
+ollama pull gemma4:31b
 # or via Docker if Ollama isn't installed locally:
-docker compose run --rm ollama ollama pull llama3.2
+docker compose run --rm ollama ollama pull gemma4:31b
 ```
 
 ### 2. Add some content
@@ -179,7 +179,7 @@ java -jar target/karpathy-wiki-0.1.0-SNAPSHOT.jar status
 
 ### Choosing a model
 
-The default model is `llama3.2`. Override it per-session:
+The default model is `gemma4:31b` (set in `docker-compose.yml`). Override it per-session:
 
 ```bash
 OLLAMA_MODEL=qwen2.5:7b ./run.sh
@@ -230,7 +230,7 @@ tags: [java, embabel, ai, agents]
 
 - **MkDocs shows 404** — `wiki/` is empty; run `./run.sh compile` first.
 - **`run.sh` starts Ollama container but model is missing** — run
-  `docker compose run --rm ollama ollama pull llama3.2` once.
+  `docker compose run --rm ollama ollama pull gemma4:31b` once.
 - **`ingest` returns nothing useful** — some sites block server-side
   fetches; download the page yourself and drop it into `raw/` manually.
 - **Compile produced nothing** — the LLM may have decided nothing in
