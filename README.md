@@ -97,26 +97,22 @@ docker compose run --rm ollama ollama pull llama3.2
 
 ### 2. Add some content
 
-Create a file in `raw/` — this is the only input the agents need.
+The `raw/` folder is gitignored (it's your personal notes). An example note is
+provided in `examples/` — copy it over to get started immediately:
 
 ```bash
-mkdir -p raw
-cat > raw/my-first-note.md << 'EOF'
+cp examples/spring-ai-intro.md raw/
+```
+
+Or drop any `.md` file into `raw/` with YAML front-matter:
+
+```markdown
 ---
 title: My First Note
 tags: [example, getting-started]
 ---
 
-Spring AI is a framework that brings AI capabilities to Spring Boot applications.
-It supports multiple LLM providers (OpenAI, Ollama, Anthropic, etc.) through a
-unified `ChatClient` abstraction. Developers can swap models by changing a config
-line, not Java code.
-
-Key concepts:
-- **ChatClient** — the main abstraction for talking to an LLM
-- **Tool calling** — the LLM can invoke Java methods as tools
-- **Advisors** — interceptors that wrap the ChatClient (e.g. memory, logging)
-EOF
+Your content here...
 ```
 
 ### 3. Compile
