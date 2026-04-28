@@ -20,5 +20,13 @@ services:
       - ./memory:/app/memory
       - ./repos:/app/repos
 
+  wiki:
+    image: squidfunk/mkdocs-material
+    command: serve --dev-addr=0.0.0.0:8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/docs
+
 volumes:
   ollama_data:

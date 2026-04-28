@@ -1,0 +1,13 @@
+site_name: Karpathy Wiki
+docs_dir: wiki
+theme:
+  name: material
+  palette:
+    scheme: slate
+    primary: indigo
+  features:
+    - navigation.sections
+    - navigation.top
+    - search.highlight
+plugins:
+  - search
