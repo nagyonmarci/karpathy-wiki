@@ -1,0 +1,10 @@
+target/
+.git/
+.vscode/
+.idea/
+wiki/
+raw/
+memory/
+repos/
+*.md
+!SCHEMA.md

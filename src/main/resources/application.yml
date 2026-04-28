@@ -7,11 +7,11 @@ spring:
     interactive:
       enabled: true
   ai:
-    openai:
-      api-key: ${OPENAI_API_KEY:REPLACE_ME}
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://ollama:11434}
       chat:
         options:
-          model: gpt-4o
+          model: ${OLLAMA_MODEL:llama3.2}
           temperature: 0.2
 
 wiki:
