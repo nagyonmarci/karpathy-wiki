@@ -20,6 +20,4 @@ WORKDIR /app
 COPY --from=builder /build/target/karpathy-wiki-*.jar app.jar
 COPY skills ./skills
 COPY SCHEMA.md .
-COPY docker-entrypoint.sh .
-RUN chmod +x docker-entrypoint.sh
-ENTRYPOINT ["./docker-entrypoint.sh"]
+ENTRYPOINT ["java", "-jar", "app.jar"]
