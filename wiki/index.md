@@ -1,9 +1,8 @@
 # Wiki
 
-The wiki is empty. Populate it by compiling your first note:
+The wiki is empty. Run the compiler to populate it:
 
 ```bash
-cp examples/spring-ai-intro.md raw/
 ./run.sh compile
 ```
 
