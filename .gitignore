@@ -11,6 +11,7 @@ karpathy-wiki.log
 # Personal wiki content — keep folder scaffolding, ignore data
 raw/*
 !raw/.gitkeep
+!raw/spring-ai-intro.md
 
 wiki/articles/*
 !wiki/articles/.gitkeep
