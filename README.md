@@ -20,18 +20,12 @@ the wiki's shape means editing one Markdown file, not three Java prompts.
 ## Tech stack
 
 - Java 26
-- Spring Boot 4.0.4 + Spring Shell (`spring-shell-starter`) — local CLI, no web server
-- Spring AI 2.0.0-M4 (`spring-ai-starter-model-openai`)
+- Spring Boot 4.0.4 + Spring Shell — local CLI, no web server
+- Spring AI 2.0.0-M4 + Ollama (runs fully locally, no API key needed)
 - spring-ai-agent-utils 0.7.0 (`FileSystemTools`, `GrepTool`, `GlobTool`, `SkillsTool`, `AutoMemoryToolsAdvisor`)
-- Maven
+- MkDocs Material — wiki viewer in the browser
 
 ## How it works
-
-This is a local Spring Shell CLI app. When you start it, you get an interactive
-`shell:>` prompt. You drive the workflow by either dropping files into `raw/`
-or running shell commands.
-
-The mental model:
 
 ```
    ┌────────┐  ingest --url ...  ┌──────────────┐
@@ -77,7 +71,7 @@ templates) and persists notes-to-self in `memory/`.
 karpathy-wiki/
 ├── SCHEMA.md    # single source of truth for wiki structure & workflows
 ├── raw/         # drop files here, or use `ingest`
-├── wiki/        # generated knowledge base
+├── wiki/        # generated knowledge base (empty until first compile)
 │   ├── articles/  concepts/  summaries/  outputs/
 │   ├── index.md      # content catalog (compiler-maintained)
 │   ├── log.md        # chronological op log (system-maintained, append-only)
@@ -87,127 +81,116 @@ karpathy-wiki/
 └── src/main/java/com/danvega/wiki/...
 ```
 
-## Setup
+## Quick start (Docker)
 
-### 1. Install prerequisites
-- JDK 26 (`java -version` should report 26)
-- Maven 3.9+
+### 1. Pull the model
 
-### 2. Set your OpenAI key
-
-```bash
-export OPENAI_API_KEY=sk-...
-```
-
-(To use a different model, edit `spring.ai.openai.chat.options.model` in
-`src/main/resources/application.yml`.)
-
-### 3. Run the app
+If Ollama is already running on your machine (port 11434), `run.sh` will use
+it automatically. Otherwise Docker will start an Ollama container for you.
 
 ```bash
-mvn spring-boot:run
+# pull once — skip if you already have llama3.2
+ollama pull llama3.2
+# or via Docker if Ollama isn't installed locally:
+docker compose run --rm ollama ollama pull llama3.2
 ```
 
-This drops you into an interactive `shell:>` prompt. The first run will
-create empty `raw/`, `wiki/`, and `memory/` directories if they don't
-already exist. You can also run a single command non-interactively:
+### 2. Add some content
+
+Create a file in `raw/` — this is the only input the agents need.
+
+```bash
+mkdir -p raw
+cat > raw/my-first-note.md << 'EOF'
+---
+title: My First Note
+tags: [example, getting-started]
+---
+
+Spring AI is a framework that brings AI capabilities to Spring Boot applications.
+It supports multiple LLM providers (OpenAI, Ollama, Anthropic, etc.) through a
+unified `ChatClient` abstraction. Developers can swap models by changing a config
+line, not Java code.
+
+Key concepts:
+- **ChatClient** — the main abstraction for talking to an LLM
+- **Tool calling** — the LLM can invoke Java methods as tools
+- **Advisors** — interceptors that wrap the ChatClient (e.g. memory, logging)
+EOF
+```
+
+### 3. Compile
+
+```bash
+./run.sh compile
+```
+
+`run.sh` detects whether Ollama is already running on your machine and uses it
+directly; if not, it starts the Ollama container first.
+
+After a few seconds, `wiki/` will be populated with linked Markdown pages.
+
+### 4. Browse the wiki
+
+```bash
+docker compose up wiki
+```
+
+Open [http://localhost:8000](http://localhost:8000).
+
+> **404 on first load?** The wiki is empty until `compile` has run at least
+> once. Add a file to `raw/` and run `./run.sh compile` first.
+
+### 5. Ask questions
+
+```bash
+./run.sh query --question "What is a ChatClient and how does it relate to advisors?"
+```
+
+### 6. Interactive shell
+
+```bash
+./run.sh
+```
+
+```
+shell:> status
+shell:> ingest --url https://spring.io/blog/2025/01/23/spring-ai-1-0-0-m6-released --title "Spring AI M6" --tags spring-ai,release
+shell:> compile
+shell:> lint
+```
+
+## Local development (without Docker)
+
+### Prerequisites
+
+- JDK 26 — `java -version` should report 26
+- Maven 3.9+ — use `make build` which sets `JAVA_HOME` automatically
+- Ollama running locally — `ollama serve`
+
+### Build & run
+
+```bash
+make build
+OLLAMA_BASE_URL=http://localhost:11434 mvn spring-boot:run
+```
+
+Or with a single command:
 
 ```bash
 java -jar target/karpathy-wiki-0.1.0-SNAPSHOT.jar status
 ```
 
-## Using it — a full walkthrough
+### Choosing a model
 
-### Step 1 — Add some content
+The default model is `llama3.2`. Override it per-session:
 
-You have two options. Use whichever is convenient.
-
-**Option A — ingest a web link (preferred):**
-
-```
-shell:> ingest --url https://lilianweng.github.io/posts/2023-06-23-agent/ --title "LLM Powered Autonomous Agents" --tags agents,llm
+```bash
+OLLAMA_MODEL=qwen2.5:7b ./run.sh
 ```
 
-What happens:
-1. `IngestService` fetches the page with `RestClient`.
-2. The LLM strips boilerplate and converts the HTML to clean Markdown.
-3. A new file like `raw/2026-04-07-llm-powered-autonomous-agents.md`
-   is written, with YAML front-matter (title, source URL, tags).
-4. If `wiki.ingest.auto-compile=true` (the default), the
-   `WikiCompilerAgent` immediately runs and integrates it into `wiki/`.
-
-**Option B — drop a YouTube transcript (or any notes):**
-
-Save any `.md`, `.txt`, or notes file into the `raw/` folder with YAML
-front-matter. If the content has an associated GitHub repo, add the `repo`
-field with the GitHub URL — the compiler will automatically shallow-clone
-it, weave real code snippets into the wiki pages, and clean up the clone
-when done.
-
-```yaml
----
-title: Embabel First Look
-source: https://youtu.be/G5VDQCZu6t0
-repo: https://github.com/danvega/blog-agent
-tags: [java, embabel, ai, agents]
----
-
-[paste transcript here]
-```
-
-Then compile:
-
-```
-shell:> compile
-```
-
-Multiple raw files can reference the same repo — it's only cloned once.
-
-### Step 2 — Watch the wiki grow
-
-After compilation, look in `wiki/`. You should see new files such as:
-- `wiki/articles/<slug>.md` — full writeup with front-matter and `[[wiki-links]]`
-- `wiki/concepts/<concept>.md` — one file per concept the agent extracted
-- `wiki/summaries/<slug>.md` — TL;DRs
-- `wiki/index.md` and `wiki/backlinks.md` — auto-maintained
-
-Open them in VS Code (or any Markdown editor). They're plain files — commit
-them to git if you want history.
-
-### Step 3 — Ask questions / generate research outputs
-
-```
-shell:> query --question "Compare ReAct and Reflexion based on my notes, and write a Marp slide deck to wiki/outputs/."
-```
-
-The `ResearchAgent` will grep/read the wiki, synthesize an answer, and (if
-you asked for an artifact) write a new file under `wiki/outputs/`. The
-output prints the answer followed by a `Sources:` block listing every
-wiki file the agent actually read.
-
-### Step 4 — Keep the wiki healthy
-
-Run the linter whenever the wiki feels messy:
-
-```
-shell:> lint
-```
-
-A deterministic Java pre-pass scans `wiki/` for **orphans** (pages with
-no inbound links), **broken links** (`[[targets]]` that don't resolve),
-and **gaps** (stub pages under 200 chars). That ground-truth report is
-handed to `WikiLinterAgent`, which then rebuilds `backlinks.md`, looks
-for **contradictions** across pages on the same topic, and suggests new
-connections. The output groups orphans, broken links, gaps, and
-contradictions.
-
-### Step 5 — Check status
-
-```
-shell:> status
-```
-
-Returns counts of files in `raw/` and `wiki/` plus your configured paths.
+Or edit `spring.ai.ollama.chat.options.model` in
+`src/main/resources/application.yml`.
 
 ## Command reference
 
@@ -232,12 +215,27 @@ chronological record of everything the system has done.
   without touching Java.
 - `memory/` is managed by `AutoMemoryToolsAdvisor` — the LLM writes its
   own notes there across conversations. You can read/edit those files too.
+- If a raw file has a `repo:` field with a GitHub URL, the compiler will
+  shallow-clone it, weave real code snippets into the wiki pages, and
+  clean up the clone when done.
+
+```yaml
+---
+title: Embabel First Look
+source: https://youtu.be/G5VDQCZu6t0
+repo: https://github.com/danvega/blog-agent
+tags: [java, embabel, ai, agents]
+---
+
+[paste transcript here]
+```
 
 ## Troubleshooting
 
-- **401 from OpenAI** — `OPENAI_API_KEY` not exported, or wrong project key.
+- **MkDocs shows 404** — `wiki/` is empty; run `./run.sh compile` first.
+- **`run.sh` starts Ollama container but model is missing** — run
+  `docker compose run --rm ollama ollama pull llama3.2` once.
 - **`ingest` returns nothing useful** — some sites block server-side
-  fetches; try downloading the page yourself and dropping it into `raw/`.
-- **Compile produced nothing** — check the app logs. The LLM may have
-  decided nothing in `raw/` was new; touch a file or add a new one and
-  re-run `compile`.
+  fetches; download the page yourself and drop it into `raw/` manually.
+- **Compile produced nothing** — the LLM may have decided nothing in
+  `raw/` was new; touch a file or add a new one and re-run `compile`.
