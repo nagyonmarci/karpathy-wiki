@@ -1,6 +1,7 @@
 services:
   ollama:
     image: ollama/ollama:latest
+    profiles: [ollama]
     volumes:
       - ollama_data:/root/.ollama
     ports:
@@ -11,15 +12,13 @@ services:
     stdin_open: true
     tty: true
     environment:
-      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2}
     volumes:
       - ./raw:/app/raw
       - ./wiki:/app/wiki
       - ./memory:/app/memory
       - ./repos:/app/repos
-    depends_on:
-      - ollama
 
 volumes:
   ollama_data:
