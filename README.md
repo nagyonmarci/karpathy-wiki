@@ -28,9 +28,13 @@ the wiki's shape means editing one Markdown file, not three Java prompts.
 ## How it works
 
 ```
-   ┌────────┐  ingest --url ...  ┌──────────────┐
-   │  you   │ ─────────────────▶ │ IngestService│  fetch URL → clean MD → save to raw/
-   └────────┘                    └──────┬───────┘
+   ┌────────┐  ingest --url <youtube>  ┌──────────────────────┐
+   │  you   │ ───────────────────────▶ │ YoutubeTranscriptClient│  poll transcript → LLM → raw/
+   └────────┘                          └──────────┬───────────┘  (requires youtube-video-transcript)
+        │                                         │
+        │  ingest --url <other>    ┌──────────────┐
+        └────────────────────────▶ │ IngestService│  fetch URL → clean MD → save to raw/
+                                   └──────┬───────┘
         │                               │
         │  copy files to import/        │
         │  (.pdf .docx .txt .md         ▼
@@ -116,13 +120,25 @@ cp ~/Downloads/chatgpt-export.json import/
 Subfolders work too — drop a whole directory into `import/` and every file is
 picked up recursively.
 
-**Option B — fetch a URL:**
+**Option B — ingest a YouTube video** (requires [youtube-video-transcript](https://github.com/nagyonmarci/youtube-video-transcript) running locally):
+
+```bash
+YOUTUBE_DIRECTUS_TOKEN=<token> ./run.sh ingest \
+  --url "https://www.youtube.com/watch?v=dQw4w9WgXcQ" \
+  --title "My Video" --tags ai,lecture
+```
+
+YouTube URLs are auto-detected — the transcript is fetched via the
+`youtube-video-transcript` API instead of HTML scraping (takes ~1 min/video).
+Set `YOUTUBE_DIRECTUS_TOKEN` once in your shell profile or in `docker-compose.yml`.
+
+**Option C — fetch any other URL:**
 
 ```bash
 ./run.sh ingest --url https://example.com/article --title "My Article" --tags ai,notes
 ```
 
-**Option C — drop a Markdown file directly:**
+**Option D — drop a Markdown file directly:**
 
 The `raw/` folder is gitignored (it's your personal notes). An example note is
 provided in `examples/` — copy it over to get started immediately:
@@ -220,7 +236,7 @@ Or edit `spring.ai.ollama.chat.options.model` in
 | Command   | Shortcut | Options                                            | Purpose |
 |-----------|----------|----------------------------------------------------|---------|
 | `import`  | `m`      | _(none)_                                           | Convert files in `import/` → `raw/`, then compile. Runs in parallel (N = `OLLAMA_NUM_PARALLEL`) |
-| `ingest`  | `i`      | `--url <url>` `--title <t>` `--tags a,b,c`         | Fetch URL → save to `raw/` → optionally auto-compile |
+| `ingest`  | `i`      | `--url <url>` `--title <t>` `--tags a,b,c`         | Fetch URL → `raw/`. YouTube URLs auto-routed to transcript API; other URLs scraped as HTML |
 | `compile` | `c`      | _(none)_                                           | Run `WikiCompilerAgent` over `raw/` |
 | `query`   | `q`      | `--question "..."`                                 | Ask `ResearchAgent`. Prints answer + sources |
 | `lint`    | `l`      | _(none)_                                           | Run `WikiLinterAgent`. Prints structured report |
@@ -252,6 +268,43 @@ tags: [java, embabel, ai, agents]
 ---
 
 [paste transcript here]
+```
+
+## YouTube integration
+
+`ingest` automatically detects `youtube.com/watch` and `youtu.be/` URLs and
+routes them to the [youtube-video-transcript](https://github.com/nagyonmarci/youtube-video-transcript)
+service instead of HTML scraping.
+
+**How it works:**
+1. `POST /fetch-video` — submits the video to the transcript fetcher queue
+2. Polls Directus every 10s until `status = "done"` (typically 50–105s/video)
+3. Sends the plain-text transcript to the LLM with a structured wiki-note prompt
+4. Saves the result to `raw/` with frontmatter (`title`, `source`, `uploaded`, `tags`)
+
+**Required environment variables:**
+
+| Variable | Default | Description |
+|---|---|---|
+| `YOUTUBE_DIRECTUS_TOKEN` | _(none)_ | Directus admin token — **required** to enable YouTube routing |
+| `YOUTUBE_FETCHER_URL` | `http://localhost:8000` | Fetcher API base URL |
+| `YOUTUBE_DIRECTUS_URL` | `http://localhost:8055` | Directus API base URL |
+
+If `YOUTUBE_DIRECTUS_TOKEN` is not set, YouTube URLs fall back to HTML scraping
+(with a warning in the log).
+
+**Set once in your shell profile:**
+```bash
+export YOUTUBE_DIRECTUS_TOKEN=your_token_here
+```
+
+**Or in `docker-compose.yml`:**
+```yaml
+karpathy-wiki:
+  environment:
+    - YOUTUBE_DIRECTUS_TOKEN=your_token_here
+    - YOUTUBE_FETCHER_URL=http://host.docker.internal:8000
+    - YOUTUBE_DIRECTUS_URL=http://host.docker.internal:8055
 ```
 
 ## Performance: parallel import
@@ -292,5 +345,10 @@ Note: each parallel context keeps a full copy of the model in VRAM.
   `docker compose run --rm ollama ollama pull gemma4:31b` once.
 - **`ingest` returns nothing useful** — some sites block server-side
   fetches; download the page yourself and drop it into `raw/` manually.
+- **YouTube ingest falls back to HTML scraping** — `YOUTUBE_DIRECTUS_TOKEN` is not set.
+  Export it in your shell or add it to `docker-compose.yml`.
+- **YouTube ingest times out** — the `youtube-video-transcript` fetcher may not be running,
+  or the video has no captions and Whisper transcription is still in progress (check
+  `docker compose logs fetcher` in that project). Default timeout is 5 minutes.
 - **Compile produced nothing** — the LLM may have decided nothing in
   `raw/` was new; touch a file or add a new one and re-run `compile`.
