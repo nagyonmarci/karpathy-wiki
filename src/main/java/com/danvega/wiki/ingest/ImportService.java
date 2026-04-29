@@ -46,8 +46,11 @@ public class ImportService {
         }
 
         List<Path> files;
-        try (Stream<Path> stream = Files.list(importDir)) {
-            files = stream.filter(Files::isRegularFile).toList();
+        try (Stream<Path> stream = Files.walk(importDir)) {
+            files = stream
+                    .filter(Files::isRegularFile)
+                    .filter(p -> !p.startsWith(processedDir))
+                    .toList();
         }
 
         if (files.isEmpty()) {
@@ -69,7 +72,10 @@ public class ImportService {
                 String slug = slugify(converter.inferTitle(file));
                 Path out = rawDir.resolve(LocalDate.now() + "-" + slug + ".md");
                 Files.writeString(out, markdown);
-                Files.move(file, processedDir.resolve(file.getFileName()));
+                Path rel = importDir.relativize(file);
+                Path dest = processedDir.resolve(rel);
+                Files.createDirectories(dest.getParent());
+                Files.move(file, dest);
                 log.info("Imported {} → {}", file.getFileName(), out.getFileName());
                 ok++;
             } catch (Exception e) {
