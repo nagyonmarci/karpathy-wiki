@@ -57,7 +57,7 @@ class IngestServiceTest {
 
         WikiProperties props = new WikiProperties(
                 new WikiProperties.Paths(rawDir.toString(), tempDir.resolve("wiki").toString(),
-                        "skills", "memory"),
+                        "skills", "memory", "./import"),
                 new WikiProperties.Ingest(false));
 
         ingestService = new IngestService(restClientBuilder, chatClientBuilder, props);

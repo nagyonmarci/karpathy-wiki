@@ -23,7 +23,7 @@ class WikiScannerTest {
     @BeforeEach
     void setUp() {
         WikiProperties props = new WikiProperties(
-                new WikiProperties.Paths("raw", wikiRoot.toString(), "skills", "memory"),
+                new WikiProperties.Paths("raw", wikiRoot.toString(), "skills", "memory", "./import"),
                 new WikiProperties.Ingest(false));
         scanner = new WikiScanner(props);
     }
@@ -44,7 +44,7 @@ class WikiScannerTest {
     void scan_emptyOrMissingRoot_returnsEmptyResult() throws IOException {
         WikiProperties props = new WikiProperties(
                 new WikiProperties.Paths("raw", wikiRoot.resolve("does-not-exist").toString(),
-                        "skills", "memory"),
+                        "skills", "memory", "./import"),
                 new WikiProperties.Ingest(false));
         WikiScanner s = new WikiScanner(props);
 

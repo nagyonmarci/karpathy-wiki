@@ -25,7 +25,7 @@ class RawPreprocessorTest {
         Files.createDirectories(rawDir);
         WikiProperties props = new WikiProperties(
                 new WikiProperties.Paths(rawDir.toString(), tempDir.resolve("wiki").toString(),
-                        "skills", "memory"),
+                        "skills", "memory", "./import"),
                 new WikiProperties.Ingest(false));
         preprocessor = new RawPreprocessor(props);
     }
@@ -40,7 +40,7 @@ class RawPreprocessorTest {
     void findChanged_missingRawDir_returnsEmpty() throws Exception {
         WikiProperties props = new WikiProperties(
                 new WikiProperties.Paths(tempDir.resolve("nope").toString(),
-                        tempDir.resolve("wiki").toString(), "skills", "memory"),
+                        tempDir.resolve("wiki").toString(), "skills", "memory", "./import"),
                 new WikiProperties.Ingest(false));
         RawPreprocessor p = new RawPreprocessor(props);
 

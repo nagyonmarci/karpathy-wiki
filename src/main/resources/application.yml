@@ -20,6 +20,7 @@ wiki:
     wiki: ./wiki
     skills: ./skills
     memory: ./memory
+    imports: ./import
   ingest:
     auto-compile: true
 

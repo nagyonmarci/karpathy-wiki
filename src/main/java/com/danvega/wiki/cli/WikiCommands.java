@@ -2,6 +2,7 @@ package com.danvega.wiki.cli;
 
 import com.danvega.wiki.compile.WikiCompilerAgent;
 import com.danvega.wiki.config.WikiProperties;
+import com.danvega.wiki.ingest.ImportService;
 import com.danvega.wiki.ingest.IngestService;
 import com.danvega.wiki.lint.LintReport;
 import com.danvega.wiki.lint.WikiLinterAgent;
@@ -20,6 +21,7 @@ import java.util.List;
 public class WikiCommands {
 
     private final IngestService ingestService;
+    private final ImportService importService;
     private final WikiCompilerAgent compiler;
     private final WikiLinterAgent linter;
     private final ResearchAgent research;
@@ -27,12 +29,14 @@ public class WikiCommands {
     private final OperationLog log;
 
     public WikiCommands(IngestService ingestService,
+                        ImportService importService,
                         WikiCompilerAgent compiler,
                         WikiLinterAgent linter,
                         ResearchAgent research,
                         WikiProperties props,
                         OperationLog log) {
         this.ingestService = ingestService;
+        this.importService = importService;
         this.compiler = compiler;
         this.linter = linter;
         this.research = research;
@@ -56,6 +60,15 @@ public class WikiCommands {
             out.append("\n\nCompiled:\n").append(compileResult);
         }
         return out.toString();
+    }
+
+    @ShellMethod(key = {"import", "m"}, value = "Process files from import/ into raw/, then compile.")
+    public String importFiles() throws Exception {
+        String importResult = importService.processAll();
+        log.append("import", importResult);
+        String compileResult = compiler.compile();
+        log.append("compile", compileResult);
+        return importResult + "\n\n" + compileResult;
     }
 
     @ShellMethod(key = {"compile", "c"}, value = "Compile raw/ files into structured wiki content.")
