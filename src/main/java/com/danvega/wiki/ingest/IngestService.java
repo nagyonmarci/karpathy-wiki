@@ -15,11 +15,8 @@ import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 
-/**
- * Fetches a URL, converts it to clean Markdown via the LLM, and saves it
- * into the {@code raw/} folder for later compilation.
- */
 @Service
 public class IngestService {
 
@@ -28,16 +25,70 @@ public class IngestService {
     private final RestClient restClient;
     private final ChatClient chatClient;
     private final WikiProperties props;
+    private final Optional<YoutubeTranscriptClient> youtubeClient;
 
     public IngestService(RestClient.Builder restClientBuilder,
                          ChatClient.Builder chatClientBuilder,
-                         WikiProperties props) {
+                         WikiProperties props,
+                         Optional<YoutubeTranscriptClient> youtubeClient) {
         this.restClient = restClientBuilder.build();
         this.chatClient = chatClientBuilder.build();
         this.props = props;
+        this.youtubeClient = youtubeClient;
     }
 
     public Path ingestUrl(String url, String title, List<String> tags) throws Exception {
+        if (isYoutubeUrl(url)) {
+            if (youtubeClient.isPresent()) {
+                return ingestYoutube(url, title, tags);
+            }
+            log.warn("YouTube URL detected but YOUTUBE_DIRECTUS_TOKEN is not configured — falling back to HTML scraping");
+        }
+        return ingestHtml(url, title, tags);
+    }
+
+    private Path ingestYoutube(String url, String title, List<String> tags) throws Exception {
+        YoutubeTranscriptClient.VideoRecord video = youtubeClient.get().fetchTranscript(url);
+
+        String effectiveTitle = (title != null && !title.isBlank()) ? title : video.title();
+        String prompt = """
+                The following is a YouTube video transcript. Convert it into a clean Markdown wiki note.
+                Structure it with logical headings, preserve code examples, and extract key insights.
+                Add YAML frontmatter with title, source URL, and tags.
+                Output only the markdown file content.
+
+                Title: %s
+                Source: %s
+                Duration: %ds
+                Uploaded: %s
+
+                Transcript:
+                %s
+                """.formatted(effectiveTitle, url, video.durationSeconds(), video.uploadedAt(), video.transcript());
+
+        String markdown = chatClient.prompt().user(prompt).call().content();
+
+        String slug = slugify(effectiveTitle);
+        Path rawDir = Path.of(props.paths().raw());
+        Files.createDirectories(rawDir);
+        Path file = rawDir.resolve(LocalDate.now() + "-" + slug + ".md");
+
+        StringBuilder out = new StringBuilder();
+        out.append("---\n");
+        out.append("title: ").append(effectiveTitle).append('\n');
+        out.append("source: ").append(url).append('\n');
+        out.append("ingested: ").append(LocalDate.now()).append('\n');
+        if (!video.uploadedAt().isBlank()) out.append("uploaded: ").append(video.uploadedAt()).append('\n');
+        if (tags != null && !tags.isEmpty()) out.append("tags: [").append(String.join(", ", tags)).append("]\n");
+        out.append("---\n\n");
+        out.append(markdown);
+
+        Files.writeString(file, out.toString());
+        log.info("Saved YouTube note to {}", file);
+        return file;
+    }
+
+    private Path ingestHtml(String url, String title, List<String> tags) throws Exception {
         log.info("Ingesting URL: {}", url);
 
         String html = restClient.get()
@@ -75,10 +126,9 @@ public class IngestService {
         String markdown = chatClient.prompt().user(prompt).call().content();
 
         String slug = slugify(title != null && !title.isBlank() ? title : url);
-        String filename = LocalDate.now() + "-" + slug + ".md";
         Path rawDir = Path.of(props.paths().raw());
         Files.createDirectories(rawDir);
-        Path file = rawDir.resolve(filename);
+        Path file = rawDir.resolve(LocalDate.now() + "-" + slug + ".md");
 
         StringBuilder out = new StringBuilder();
         out.append("---\n");
@@ -94,6 +144,10 @@ public class IngestService {
         Files.writeString(file, out.toString());
         log.info("Saved ingested content to {}", file);
         return file;
+    }
+
+    private static boolean isYoutubeUrl(String url) {
+        return url.contains("youtube.com/watch") || url.contains("youtu.be/");
     }
 
     private static String slugify(String input) {

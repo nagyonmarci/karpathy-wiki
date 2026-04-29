@@ -15,6 +15,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -60,7 +61,7 @@ class IngestServiceTest {
                         "skills", "memory", "./import"),
                 new WikiProperties.Ingest(false, 1));
 
-        ingestService = new IngestService(restClientBuilder, chatClientBuilder, props);
+        ingestService = new IngestService(restClientBuilder, chatClientBuilder, props, Optional.empty());
     }
 
     @Test

@@ -24,7 +24,13 @@ wiki:
   ingest:
     auto-compile: true
     parallelism: -1   # -1 = auto (availableProcessors/4, max 4), 1 = sequential
+  youtube:
+    fetcher-url: ${YOUTUBE_FETCHER_URL:http://localhost:8000}
+    directus-url: ${YOUTUBE_DIRECTUS_URL:http://localhost:8055}
+    directus-token: ${YOUTUBE_DIRECTUS_TOKEN:}
+    poll-interval-seconds: 10
+    timeout-seconds: 300
 
 logging:
   level:
-    com.danvega.wiki: DEBUG
+    "[com.danvega.wiki]": DEBUG
