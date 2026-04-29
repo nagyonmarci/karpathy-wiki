@@ -11,3 +11,4 @@ theme:
     - search.highlight
 plugins:
   - search
+  - roamlinks

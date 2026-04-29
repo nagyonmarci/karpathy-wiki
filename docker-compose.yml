@@ -23,7 +23,9 @@ services:
       - ./import:/app/import
 
   wiki:
-    image: squidfunk/mkdocs-material:9
+    build:
+      context: .
+      dockerfile: Dockerfile.wiki
     command: serve --dev-addr=0.0.0.0:8000
     ports:
       - "8000:8000"
