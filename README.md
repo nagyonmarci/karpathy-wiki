@@ -32,33 +32,39 @@ the wiki's shape means editing one Markdown file, not three Java prompts.
    │  you   │ ─────────────────▶ │ IngestService│  fetch URL → clean MD → save to raw/
    └────────┘                    └──────┬───────┘
         │                               │
-        │ drop .md files                ▼
-        │                         ┌───────────┐
-        └────────────────────────▶│   raw/    │
-                                  └─────┬─────┘
-                                        │ compile
-                                        ▼
-                            ┌────────────────────────┐
-                            │  WikiCompilerAgent     │
-                            │  (LLM + filesystem     │
-                            │   + skills + memory)   │
-                            └───────────┬────────────┘
-                                        │ writes
-                                        ▼
-                            ┌────────────────────────┐
-                            │ wiki/articles/         │
-                            │ wiki/concepts/         │
-                            │ wiki/summaries/        │
-                            │ wiki/index.md          │
-                            │ wiki/backlinks.md      │
-                            └───────────┬────────────┘
-                                        │
-                       query "..."      │            lint
-        ┌──────────────────┐            │            ┌──────────────────┐
-        │  ResearchAgent   │◀───────────┴───────────▶│ WikiLinterAgent  │
-        │  reads wiki/,    │                         │ rebuilds backlink│
-        │  writes outputs/ │                         │ dedupes, etc.    │
-        └──────────────────┘                         └──────────────────┘
+        │  copy files to import/        │
+        │  (.pdf .docx .txt .md         ▼
+        │   claude-*.json          ┌──────────────┐
+        │   chatgpt-*.json)        │ ImportService│  parse → LLM → raw/  (parallel, N=OLLAMA_NUM_PARALLEL)
+        └────────────────────────▶ └──────┬───────┘  processed files → import/processed/
+                                          │
+                                          ▼
+                                    ┌───────────┐
+                                    │   raw/    │
+                                    └─────┬─────┘
+                                          │ compile
+                                          ▼
+                              ┌────────────────────────┐
+                              │  WikiCompilerAgent     │
+                              │  (LLM + filesystem     │
+                              │   + skills + memory)   │
+                              └───────────┬────────────┘
+                                          │ writes
+                                          ▼
+                              ┌────────────────────────┐
+                              │ wiki/articles/         │
+                              │ wiki/concepts/         │
+                              │ wiki/summaries/        │
+                              │ wiki/index.md          │
+                              │ wiki/backlinks.md      │
+                              └───────────┬────────────┘
+                                          │
+                         query "..."      │            lint
+        ┌──────────────────┐              │            ┌──────────────────┐
+        │  ResearchAgent   │◀─────────────┴───────────▶│ WikiLinterAgent  │
+        │  reads wiki/,    │                           │ rebuilds backlink│
+        │  writes outputs/ │                           │ dedupes, etc.    │
+        └──────────────────┘                           └──────────────────┘
 ```
 
 All three agents are `ChatClient`s wired with the agent-utils tools so the
@@ -70,6 +76,8 @@ templates) and persists notes-to-self in `memory/`.
 ```
 karpathy-wiki/
 ├── SCHEMA.md    # single source of truth for wiki structure & workflows
+├── import/      # drop documents here → `import` command processes them
+│   └── processed/   # successfully imported files land here
 ├── raw/         # drop files here, or use `ingest`
 ├── wiki/        # generated knowledge base (empty until first compile)
 │   ├── articles/  concepts/  summaries/  outputs/
@@ -96,6 +104,25 @@ docker compose run --rm ollama ollama pull gemma4:31b
 ```
 
 ### 2. Add some content
+
+**Option A — import your own documents** (PDF, DOCX, TXT, MD, Claude/ChatGPT JSON exports):
+
+```bash
+cp ~/Downloads/lecture.pdf import/
+cp ~/Downloads/chatgpt-export.json import/
+./run.sh import      # converts, compiles, and moves files to import/processed/
+```
+
+Subfolders work too — drop a whole directory into `import/` and every file is
+picked up recursively.
+
+**Option B — fetch a URL:**
+
+```bash
+./run.sh ingest --url https://example.com/article --title "My Article" --tags ai,notes
+```
+
+**Option C — drop a Markdown file directly:**
 
 The `raw/` folder is gitignored (it's your personal notes). An example note is
 provided in `examples/` — copy it over to get started immediately:
@@ -192,11 +219,12 @@ Or edit `spring.ai.ollama.chat.options.model` in
 
 | Command   | Shortcut | Options                                            | Purpose |
 |-----------|----------|----------------------------------------------------|---------|
+| `import`  | `m`      | _(none)_                                           | Convert files in `import/` → `raw/`, then compile. Runs in parallel (N = `OLLAMA_NUM_PARALLEL`) |
 | `ingest`  | `i`      | `--url <url>` `--title <t>` `--tags a,b,c`         | Fetch URL → save to `raw/` → optionally auto-compile |
 | `compile` | `c`      | _(none)_                                           | Run `WikiCompilerAgent` over `raw/` |
 | `query`   | `q`      | `--question "..."`                                 | Ask `ResearchAgent`. Prints answer + sources |
 | `lint`    | `l`      | _(none)_                                           | Run `WikiLinterAgent`. Prints structured report |
-| `status`  | `s`      | _(none)_                                           | Counts and paths |
+| `status`  | `s`      | _(none)_                                           | File counts, paths, CPU cores, effective parallelism |
 
 Every successful `ingest`, `compile`, `query`, and `lint` invocation
 appends a one-line entry to `wiki/log.md` so you have an auditable
@@ -225,6 +253,37 @@ tags: [java, embabel, ai, agents]
 
 [paste transcript here]
 ```
+
+## Performance: parallel import
+
+`ImportService` processes files concurrently — the number of parallel LLM calls
+matches `OLLAMA_NUM_PARALLEL` on the Ollama server (default: 2).
+
+When multiple requests arrive simultaneously, Ollama batches them into a single
+GPU pass: the model weights are read from memory once and used to compute tokens
+for all N requests in parallel. This improves GPU core utilisation on large
+unified-memory chips (e.g. M4 Max: 40 GPU cores, 128 GB, ~546 GB/s bandwidth).
+
+To increase throughput further, raise `OLLAMA_NUM_PARALLEL` and set
+`wiki.ingest.parallelism` to match:
+
+```bash
+# host Ollama (macOS)
+launchctl setenv OLLAMA_NUM_PARALLEL 4
+# restart Ollama, then:
+OLLAMA_NUM_PARALLEL=4 ./run.sh import
+```
+
+Or in `docker-compose.yml` for the containerised Ollama:
+
+```yaml
+ollama:
+  environment:
+    - OLLAMA_NUM_PARALLEL=4
+```
+
+Note: each parallel context keeps a full copy of the model in VRAM.
+`gemma4:31b` = ~47 GB, so on a 128 GB system the practical limit is 2.
 
 ## Troubleshooting
 
