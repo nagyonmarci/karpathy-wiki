@@ -92,7 +92,7 @@ public class WikiCompilerAgent {
 
     static String buildUserMessage(List<Path> changed, Map<String, Path> repoMap) {
         String fileList = changed.stream()
-                .map(p -> "- " + p.toAbsolutePath())
+                .map(p -> "- raw/" + p.getFileName())
                 .collect(Collectors.joining("\n"));
 
         StringBuilder sb = new StringBuilder();
