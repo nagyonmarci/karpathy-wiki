@@ -26,7 +26,7 @@ class RawPreprocessorTest {
         WikiProperties props = new WikiProperties(
                 new WikiProperties.Paths(rawDir.toString(), tempDir.resolve("wiki").toString(),
                         "skills", "memory", "./import"),
-                new WikiProperties.Ingest(false));
+                new WikiProperties.Ingest(false, 1));
         preprocessor = new RawPreprocessor(props);
     }
 
@@ -41,7 +41,7 @@ class RawPreprocessorTest {
         WikiProperties props = new WikiProperties(
                 new WikiProperties.Paths(tempDir.resolve("nope").toString(),
                         tempDir.resolve("wiki").toString(), "skills", "memory", "./import"),
-                new WikiProperties.Ingest(false));
+                new WikiProperties.Ingest(false, 1));
         RawPreprocessor p = new RawPreprocessor(props);
 
         assertThat(p.findChanged()).isEmpty();

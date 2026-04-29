@@ -10,5 +10,5 @@ public record WikiProperties(Paths paths, Ingest ingest) {
 
     public record Paths(String raw, String wiki, String skills, String memory, String imports) {}
 
-    public record Ingest(boolean autoCompile) {}
+    public record Ingest(boolean autoCompile, int parallelism) {}
 }

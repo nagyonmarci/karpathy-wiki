@@ -110,16 +110,30 @@ public class WikiCommands {
         return sb.toString();
     }
 
-    @ShellMethod(key = {"status", "s"}, value = "Show wiki/raw file counts and configured paths.")
+    @ShellMethod(key = {"status", "s"}, value = "Show wiki/raw file counts, paths, and hardware info.")
     public String status() throws Exception {
         long raw = count(props.paths().raw());
         long wiki = count(props.paths().wiki());
+        int cpus = Runtime.getRuntime().availableProcessors();
+        long ramGb = Runtime.getRuntime().maxMemory() / (1024 * 1024 * 1024);
+        int parallelism = effectiveParallelism();
         return """
-                raw files:  %d  (%s)
-                wiki files: %d  (%s)
-                skills dir: %s
-                memory dir: %s
-                """.formatted(raw, props.paths().raw(), wiki, props.paths().wiki(), props.paths().skills(), props.paths().memory());
+                raw files:   %d  (%s)
+                wiki files:  %d  (%s)
+                skills dir:  %s
+                memory dir:  %s
+                ---
+                CPU cores:   %d available  →  import parallelism: %d
+                JVM max RAM: %d GB  (set OLLAMA_NUM_PARALLEL=%d on the Ollama host for GPU batching)
+                """.formatted(raw, props.paths().raw(), wiki, props.paths().wiki(),
+                props.paths().skills(), props.paths().memory(),
+                cpus, parallelism, ramGb, parallelism);
+    }
+
+    private int effectiveParallelism() {
+        int cfg = props.ingest().parallelism();
+        if (cfg > 0) return cfg;
+        return Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors() / 4));
     }
 
     private long count(String dir) throws Exception {

@@ -2,6 +2,8 @@ services:
   ollama:
     image: ollama/ollama:latest
     profiles: [ollama]
+    environment:
+      - OLLAMA_NUM_PARALLEL=2
     volumes:
       - ollama_data:/root/.ollama
     ports:

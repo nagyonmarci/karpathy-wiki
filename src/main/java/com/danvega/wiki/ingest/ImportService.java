@@ -11,6 +11,11 @@ import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 @Service
@@ -57,33 +62,62 @@ public class ImportService {
             return "No files found in import/ — nothing to process.";
         }
 
-        int ok = 0, failed = 0;
-        for (Path file : files) {
-            FileConverter converter = converters.stream()
-                    .filter(c -> c.supports(file))
-                    .findFirst()
-                    .orElse(null);
-            if (converter == null) {
-                log.warn("No converter for {}, skipping", file.getFileName());
-                continue;
-            }
-            try {
-                String markdown = converter.toMarkdown(file, chatClient);
-                String slug = slugify(converter.inferTitle(file));
-                Path out = rawDir.resolve(LocalDate.now() + "-" + slug + ".md");
-                Files.writeString(out, markdown);
-                Path rel = importDir.relativize(file);
-                Path dest = processedDir.resolve(rel);
-                Files.createDirectories(dest.getParent());
-                Files.move(file, dest);
-                log.info("Imported {} → {}", file.getFileName(), out.getFileName());
-                ok++;
-            } catch (Exception e) {
-                log.error("Failed to import {}: {}", file.getFileName(), e.getMessage());
-                failed++;
-            }
+        int n = effectiveParallelism();
+        log.info("Processing {} file(s) with parallelism={}", files.size(), n);
+
+        AtomicInteger ok = new AtomicInteger();
+        AtomicInteger failed = new AtomicInteger();
+
+        List<Callable<Void>> tasks = files.stream()
+                .<Callable<Void>>map(file -> () -> {
+                    if (processFile(file, importDir, processedDir, rawDir)) ok.incrementAndGet();
+                    else failed.incrementAndGet();
+                    return null;
+                })
+                .toList();
+
+        ExecutorService pool = Executors.newFixedThreadPool(n);
+        try {
+            List<Future<Void>> futures = pool.invokeAll(tasks);
+            for (Future<Void> f : futures) f.get(); // propagate exceptions
+        } finally {
+            pool.shutdown();
         }
-        return "Import complete: %d processed, %d failed.".formatted(ok, failed);
+
+        return "Import complete: %d processed, %d failed.".formatted(ok.get(), failed.get());
+    }
+
+    private boolean processFile(Path file, Path importDir, Path processedDir, Path rawDir) {
+        FileConverter converter = converters.stream()
+                .filter(c -> c.supports(file))
+                .findFirst()
+                .orElse(null);
+        if (converter == null) {
+            log.warn("No converter for {}, skipping", file.getFileName());
+            return false;
+        }
+        try {
+            String markdown = converter.toMarkdown(file, chatClient);
+            String slug = slugify(converter.inferTitle(file));
+            Path out = rawDir.resolve(LocalDate.now() + "-" + slug + ".md");
+            Files.writeString(out, markdown);
+            Path rel = importDir.relativize(file);
+            Path dest = processedDir.resolve(rel);
+            Files.createDirectories(dest.getParent());
+            Files.move(file, dest);
+            log.info("Imported {} → {}", file.getFileName(), out.getFileName());
+            return true;
+        } catch (Exception e) {
+            log.error("Failed to import {}: {}", file.getFileName(), e.getMessage());
+            return false;
+        }
+    }
+
+    private int effectiveParallelism() {
+        int cfg = props.ingest().parallelism();
+        if (cfg > 0) return cfg;
+        // Auto: quarter of CPU cores, min 1, max 4 (Ollama VRAM is the real ceiling)
+        return Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors() / 4));
     }
 
     private static String slugify(String input) {

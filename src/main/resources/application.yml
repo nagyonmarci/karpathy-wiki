@@ -23,6 +23,7 @@ wiki:
     imports: ./import
   ingest:
     auto-compile: true
+    parallelism: -1   # -1 = auto (availableProcessors/4, max 4), 1 = sequential
 
 logging:
   level:
