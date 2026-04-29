@@ -27,6 +27,9 @@ services:
       - "8000:8000"
     volumes:
       - .:/docs
+    depends_on:
+      karpathy-wiki:
+        condition: service_completed_successfully
 
 volumes:
   ollama_data:
