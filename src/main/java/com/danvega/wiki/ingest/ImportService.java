@@ -116,8 +116,12 @@ public class ImportService {
     private int effectiveParallelism() {
         int cfg = props.ingest().parallelism();
         if (cfg > 0) return cfg;
-        // Auto: quarter of CPU cores, min 1, max 4 (Ollama VRAM is the real ceiling)
-        return Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors() / 4));
+        // Mirror Ollama's server-side batch capacity — VRAM/model-size is the real ceiling, not CPU cores
+        String env = System.getenv("OLLAMA_NUM_PARALLEL");
+        if (env != null) {
+            try { return Math.max(1, Integer.parseInt(env.trim())); } catch (NumberFormatException ignored) {}
+        }
+        return 2; // matches docker-compose default OLLAMA_NUM_PARALLEL=2
     }
 
     private static String slugify(String input) {

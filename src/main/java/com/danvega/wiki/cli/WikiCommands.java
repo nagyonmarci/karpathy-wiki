@@ -133,7 +133,11 @@ public class WikiCommands {
     private int effectiveParallelism() {
         int cfg = props.ingest().parallelism();
         if (cfg > 0) return cfg;
-        return Math.max(1, Math.min(4, Runtime.getRuntime().availableProcessors() / 4));
+        String env = System.getenv("OLLAMA_NUM_PARALLEL");
+        if (env != null) {
+            try { return Math.max(1, Integer.parseInt(env.trim())); } catch (NumberFormatException ignored) {}
+        }
+        return 2;
     }
 
     private long count(String dir) throws Exception {
